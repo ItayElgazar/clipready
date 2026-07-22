@@ -2,8 +2,8 @@
 
 Every feature of the authored `<job>/timeline.json` (version 2), with one minimal JSON
 example each. Validate with `video-editing timeline validate`; compile with
-`timeline compile` (it resolves phrase anchors, derives caption cues and emits
-`resolved/plan.json` + legacy `edl.json`). Items all carry a unique `id`; word anchors
+`timeline compile` (cloud compile — it resolves phrase anchors, derives caption cues
+and emits `resolved/plan.json`). Items all carry a unique `id`; word anchors
 (`{type:"words", source, phrase}`) resolve via the transcript — use `timeline resolve`
 to disambiguate. Capability status per feature: run `timeline validate` — `staged`
 features compile but warn (render path not yet proven); `ready` features render via
