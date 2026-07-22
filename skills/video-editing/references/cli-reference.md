@@ -18,17 +18,23 @@ anchor (timeline group).
 
 ## Pipeline commands
 
-- **`init --video <path> [--job-dir <dir>] [--master] [--force]`**
+- **`init --source <path> [--job-dir <dir>] [--master] [--force]`**
   Upload the source and create the cloud job. Writes the job dir (default: a
-  new dir named for the clip) with `job.json` (`video_id`, api base) and
-  `source.json`. `--master` bakes the vertical 9:16 master locally (ffmpeg)
-  before upload, for non-vertical sources destined for a vertical deliverable.
+  new dir named for the clip) with `job.json` (`video_id`, api base,
+  `source_path` — the absolute source location later verbs fall back to).
+  Prints the video's web page link (`web_url` in `--json`). The internal stem
+  is sanitized to a filename-safe charset, so apostrophe/space/unicode
+  filenames work end to end with no rename. `--master` bakes the vertical
+  9:16 master locally (ffmpeg) before upload, for non-vertical sources
+  destined for a vertical deliverable.
 
-- **`transcribe --job-dir <dir> [--language <iso>] [--num-speakers <n>] [--force]`**
+- **`transcribe --job-dir <dir> [--media <path>] [--language <iso>] [--num-speakers <n>] [--force]`**
   Upload the audio; the **cloud** transcribes and screens it, then the CLI
   pulls the results into the job dir: `transcripts/*.json`, `word_dump.txt`,
   `takes_packed.md`, `flags.txt`, `coverage.json`, and the editorial brief
   `prompts/author-edl.prompt.md` (plus any other `prompts/*.md` the server sends).
+  Media defaults to `<job>/vertical_src.mp4`, else the init source recorded in
+  `job.json` (`source_path`) — `--media` is only needed when both are gone.
   Cached server-side per source; `--force` re-transcribes.
 
 ## Timeline commands (`timeline.json` v2)
@@ -53,13 +59,21 @@ anchor (timeline group).
 
 ## Preview / render commands
 
-- **`compose --job-dir <dir> [--render] [--quality draft|standard|high] [--fps 30] [--out <path>] [--json]`**
+- **`compose --job-dir <dir> [--render] [--quality draft|standard|high] [--fps 30] [--out <path>] [--no-push] [--json]`**
   Build the local HyperFrames composition from `resolved/plan.json` (cut +
   captions/zooms/overlays) in `<job>/composition/` — media proxies, referenced
   assets, and `index.html`. Without `--render`, prints the composition dir +
   the exact `hyperframes render` command to run. With `--render`, runs it
   (requires the `hyperframes` CLI on PATH: `npm install -g hyperframes`);
   default output `<job>/preview.mp4` (the render IS the preview in the cloud-first flow). This is the LOCAL delivery path.
+  If `<job>/vertical_src.mp4` is missing, compose **bakes it automatically**
+  from `job.json`'s `source_path` (ffmpeg applies rotation metadata, so
+  rotated sources come out truly vertical) — no re-init needed.
+  After a successful render the output is **pushed to the video's cloud
+  files automatically** (a custom `--out` basename is also pushed under
+  `final.mp4` when `--quality high`, else `preview.mp4`, so the web watch
+  page sees it) and the CLI prints `View & comment: <url>` (`web_url` +
+  `pushed` in `--json`). `--no-push` skips the upload.
 
 - **`cloud render --job-dir <dir> --mode preview|final [--wait] [--poll-interval 10] [--out <path>] [--json]`**
   Submit a server-side render of the compiled plan. Without `--wait`: prints
@@ -79,6 +93,9 @@ anchor (timeline group).
   retake left in → error) and over-long gaps (dead air → warning/error).
   Writes `verify.json`; exit `2` on needs-fixes. Requires a rendered preview
   (`compose` + hyperframes render, or `cloud render --mode preview`).
+  Caveat: the duplicated-phrase check over-triggers on thematically narrow
+  monologues — if every join is flagged (including plain pause-tightening
+  joins), adjudicate against `flags.txt` instead of blindly recutting.
 
 - **`qa frames --range <start>-<end> [--cols <n>] [--interval <s>] --job-dir <dir> [--json]`**
   **Local ffmpeg** filmstrip PNG for the window →
@@ -135,7 +152,7 @@ anchor (timeline group).
 
 ```
 export CLIPREADY_API_BASE=https://…  CLIPREADY_API_KEY=…
-video-editing init --video "clip.mp4" --job-dir jobs/clip
+video-editing init --source "clip.mp4" --job-dir jobs/clip
 video-editing transcribe --job-dir jobs/clip
 # READ jobs/clip/prompts/author-edl.prompt.md — it is the editorial brief. Author timeline.json.
 video-editing timeline compile --job-dir jobs/clip --json     # fix until exit 0

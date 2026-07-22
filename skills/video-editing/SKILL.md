@@ -59,9 +59,13 @@ never work around it.
 
 ## The workflow
 
-1. **Init** — `video-editing init --video "<path>"` (add `--job-dir "<dir>"` to
+1. **Init** — `video-editing init --source "<path>"` (add `--job-dir "<dir>"` to
    choose the working dir). Uploads the source and creates the cloud job;
-   writes `<job>/job.json` with the `video_id` every later verb uses.
+   writes `<job>/job.json` with the `video_id` every later verb uses (plus
+   `source_path`, so later verbs can find the source again). Prints the
+   video's web link on success. Filenames with apostrophes, spaces, or
+   unicode are safe — the internal stem is sanitized automatically; never
+   rename the user's file to work around a filename.
 2. **Transcribe** — `video-editing transcribe --job-dir "<job>"`. Uploads the
    audio; the cloud transcribes **and screens** it, then the CLI pulls the
    results into the job dir: `transcripts/`, `word_dump.txt`,
@@ -86,7 +90,13 @@ never work around it.
    the local HyperFrames composition in `<job>/composition/` (with
    `index.html`), then render it locally with the `hyperframes` CLI
    (`npm install -g hyperframes`; `compose` prints the exact command, or pass
-   `--render`). No hyperframes / no local horsepower? Use
+   `--render`). After a successful `--render` the CLI **automatically pushes
+   the rendered file to the cloud** and prints a
+   `View & comment: <url>` link — share that link with the user; pass
+   `--no-push` to keep the render local-only. If `<job>/vertical_src.mp4` is
+   missing (e.g. `init --master` was skipped), compose bakes it on the fly
+   from the recorded init source — do NOT re-init or re-transcribe.
+   No hyperframes / no local horsepower? Use
    `video-editing cloud render --job-dir "<job>" --mode preview --wait` instead.
 7. **Verify** — `video-editing verify --job-dir "<job>" --json`. Cloud
    verification of the rendered preview (catches retakes left in across a
@@ -113,10 +123,25 @@ pointing there. If `prompts/author-edl.prompt.md` is missing, run
 
 ## Vertical master
 
-`init --video` uploads the source as-is. When the deliverable is a vertical
+`init --source` uploads the source as-is. When the deliverable is a vertical
 9:16 reel from a non-vertical source, pass `--master` to `init` so the
 vertical master is baked before upload (needs local ffmpeg). Check
 `video-editing init --help` for the current flag surface.
+
+If you skipped `--master` (e.g. the source is "already vertical" via rotation
+metadata), don't worry: `compose` bakes `vertical_src.mp4` on demand from the
+init source recorded in `job.json`. **Never** start a fresh `init` just
+because the master is missing — that orphans the cloud job and shifts word
+timings.
+
+## Known caveats
+
+- **`verify` over-triggers on thematically narrow monologues.** The
+  duplicated-phrase join check flags legitimately repeated wording as
+  "retake left in". If EVERY join comes back flagged — including plain
+  pause-tightening joins that obviously aren't retakes — adjudicate each
+  finding against `flags.txt` (the screening output) instead of blindly
+  recutting; only recut joins that flags.txt corroborates as real retakes.
 
 ## File sync
 
