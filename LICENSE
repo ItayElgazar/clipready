@@ -1,0 +1,29 @@
+ClipReady video-editing License
+
+Copyright (c) 2026 Itay Elgazar. All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software, the accompanying skill files, and associated documentation
+(the "Software"), to install and use the Software, including for commercial
+purposes, subject to the following conditions:
+
+1. No redistribution. You may not publish, sublicense, sell, rent, lease, or
+   otherwise distribute the Software or any portion of it, except that
+   installing the Software through official distribution channels (npm, the
+   official GitHub repository) is permitted.
+
+2. No modification or derivative works. You may not modify, adapt, translate,
+   or create derivative works based on the Software, and you may not reverse
+   engineer, decompile, or disassemble it except to the extent permitted by
+   applicable law.
+
+3. Notices. You may not remove or alter any copyright, license, or attribution
+   notices contained in the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHOR OR COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
