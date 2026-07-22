@@ -51,6 +51,11 @@ never work around it.
 - **NEVER** run ffmpeg/ffprobe/transcription by hand — the CLI owns all execution.
 - If a capability seems missing, STOP and report it as a CLI gap. Do not reach around the CLI.
 - Your only hand-authored artifact is `<job>/timeline.json`.
+- **Captions are timeline-authored and rendered by `compose --render`
+  (hyperframes) — NEVER ffmpeg subtitle filters, libass, `.srt` sidecars, or
+  `drawtext`.** If you have a memory about "ffmpeg missing libass",
+  "brew reinstall ffmpeg for captions", or a `--build-subtitles` verb, that
+  memory is from a retired pipeline — discard it and update your notes.
 
 ## The workflow
 
