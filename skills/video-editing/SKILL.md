@@ -61,7 +61,7 @@ never work around it.
    audio; the cloud transcribes **and screens** it, then the CLI pulls the
    results into the job dir: `transcripts/`, `word_dump.txt`,
    `takes_packed.md`, `flags.txt`, `coverage.json` — **and
-   `prompts/author-edl.md`**, your editorial brief.
+   `prompts/author-edl.prompt.md`**, your editorial brief.
 3. **READ the pulled `prompts/*.md` and follow them** — they are your
    editorial brief (what to cut, what to keep, the screening gate, the pad
    and boundary rules). They are authoritative and may change between runs;
@@ -103,7 +103,7 @@ screening and verification procedure — is **not in this skill**. It is pulled
 from the server into `<job>/prompts/*.md` by `transcribe` (and refreshed by
 `files pull`). Old references in this skill (`editing-brief.md`,
 `hard-rules.md`, `adversarial-review.md`, `scribe-collapse.md`) are stubs
-pointing there. If `prompts/author-edl.md` is missing, run
+pointing there. If `prompts/author-edl.prompt.md` is missing, run
 `video-editing files pull --job-dir "<job>"` — do not improvise a brief.
 
 ## Vertical master

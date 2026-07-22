@@ -28,7 +28,7 @@ anchor (timeline group).
   Upload the audio; the **cloud** transcribes and screens it, then the CLI
   pulls the results into the job dir: `transcripts/*.json`, `word_dump.txt`,
   `takes_packed.md`, `flags.txt`, `coverage.json`, and the editorial brief
-  `prompts/author-edl.md` (plus any other `prompts/*.md` the server sends).
+  `prompts/author-edl.prompt.md` (plus any other `prompts/*.md` the server sends).
   Cached server-side per source; `--force` re-transcribes.
 
 ## Timeline commands (`timeline.json` v2)
@@ -59,7 +59,7 @@ anchor (timeline group).
   assets, and `index.html`. Without `--render`, prints the composition dir +
   the exact `hyperframes render` command to run. With `--render`, runs it
   (requires the `hyperframes` CLI on PATH: `npm install -g hyperframes`);
-  default output `<job>/composed.mp4`. This is the LOCAL delivery path.
+  default output `<job>/preview.mp4` (the render IS the preview in the cloud-first flow). This is the LOCAL delivery path.
 
 - **`cloud render --job-dir <dir> --mode preview|final [--wait] [--poll-interval 10] [--out <path>] [--json]`**
   Submit a server-side render of the compiled plan. Without `--wait`: prints
@@ -95,8 +95,8 @@ anchor (timeline group).
 - **`files pull --job-dir <dir> [--only <name,name>] [--json]`**
   List the cloud job's artifacts and fetch each (or the `--only` subset) into
   the job dir, **preserving relative paths** (`resolved/plan.json` →
-  `<job>/resolved/plan.json`, `prompts/author-edl.md` →
-  `<job>/prompts/author-edl.md`). `.json` artifacts pretty-printed. Use to
+  `<job>/resolved/plan.json`, `prompts/author-edl.prompt.md` →
+  `<job>/prompts/author-edl.prompt.md`). `.json` artifacts pretty-printed. Use to
   recover job state on a fresh machine.
 
 - **`files push --job-dir <dir> [--only <name,name>] [--json]`**
@@ -137,7 +137,7 @@ anchor (timeline group).
 export CLIPREADY_API_BASE=https://…  CLIPREADY_API_KEY=…
 video-editing init --video "clip.mp4" --job-dir jobs/clip
 video-editing transcribe --job-dir jobs/clip
-# READ jobs/clip/prompts/author-edl.md — it is the editorial brief. Author timeline.json.
+# READ jobs/clip/prompts/author-edl.prompt.md — it is the editorial brief. Author timeline.json.
 video-editing timeline compile --job-dir jobs/clip --json     # fix until exit 0
 video-editing compose --job-dir jobs/clip --render            # local preview render
 video-editing verify --job-dir jobs/clip --json               # fix → recompile → re-render → re-verify
