@@ -1,6 +1,8 @@
-# `video-editing` CLI reference (v2 — cloud-only)
+# `video-editing` CLI reference (v3 — pure API client)
 
-All execution goes through this CLI. Quote paths (they contain spaces).
+All execution goes through this CLI, and the CLI runs NOTHING locally: every
+verb is HTTP against the ClipReady cloud plus small artifact pulls. Quote
+paths (they contain spaces).
 
 **Every verb requires ClipReady credentials.** Resolution:
 
@@ -9,77 +11,76 @@ All execution goes through this CLI. Quote paths (they contain spaces).
 - **video id**: `--video-id` → `<job>/job.json` (written by `init`) → env `VIDEO_ID`
 
 A missing base or key is a clear error → non-zero exit, nothing runs. There is
-**no ElevenLabs configuration** — transcription is server-side in the ClipReady
-cloud.
+**no ffmpeg/ffprobe/hyperframes requirement and no ElevenLabs
+configuration** — media work is server-side in the ClipReady cloud.
 
 Most verbs support `--json` for a machine-readable result. Exit codes: `0` ok,
 `1` error (incl. missing credentials), `2` validation failed, `3` ambiguous
 anchor (timeline group).
 
+**Large uploads are chunked automatically** (no flag needed): the init source
+streams up in 8MB parts with per-part retry — a 2GB file is never buffered in
+memory — and on networks where direct storage PUTs keep dying, parts fall back
+to an authenticated relay through the API. Servers without chunked-upload
+support transparently fall back to a single retried upload.
+
 ## Pipeline commands
 
-- **`init --source <path> [--job-dir <dir>] [--master] [--force]`**
-  Upload the source and create the cloud job. Writes the job dir (default: a
-  new dir named for the clip) with `job.json` (`video_id`, api base,
-  `source_path` — the absolute source location later verbs fall back to).
-  Prints the video's web page link (`web_url` in `--json`). The internal stem
-  is sanitized to a filename-safe charset, so apostrophe/space/unicode
-  filenames work end to end with no rename. `--master` bakes the vertical
-  9:16 master locally (ffmpeg) before upload, for non-vertical sources
-  destined for a vertical deliverable.
+- **`init --source <path> [--job-dir <dir>] [--title <t>] [--poll-interval 5]`**
+  ONE command covers what init+transcribe used to do. Streams the source up,
+  creates the cloud job, runs server-side **ingest** (probe + audio
+  extraction + transcription + editorial screening), polls with progress
+  lines, then pulls into the job dir: `transcripts/*.json`, `word_dump.txt`,
+  `takes_packed.md`, `flags.txt`, `coverage.json`, `probe.json`, and the
+  editorial brief `prompts/author-edl.prompt.md` (plus any other
+  `prompts/*.md`). Writes `job.json` (`video_id`, api base, stem,
+  `duration_s` from the server probe, `source_path`) and prints the video's
+  web page link (`web_url` in `--json`). The internal stem is sanitized to a
+  filename-safe charset, so apostrophe/space/unicode filenames work end to
+  end with no rename.
 
-- **`transcribe --job-dir <dir> [--media <path>] [--language <iso>] [--num-speakers <n>] [--force]`**
-  Upload the audio; the **cloud** transcribes and screens it, then the CLI
-  pulls the results into the job dir: `transcripts/*.json`, `word_dump.txt`,
-  `takes_packed.md`, `flags.txt`, `coverage.json`, and the editorial brief
-  `prompts/author-edl.prompt.md` (plus any other `prompts/*.md` the server sends).
-  Media defaults to `<job>/vertical_src.mp4`, else the init source recorded in
-  `job.json` (`source_path`) — `--media` is only needed when both are gone.
-  Cached server-side per source; `--force` re-transcribes.
+- **`transcribe --job-dir <dir> [--poll-interval 5]`**
+  Re-run/pull only (init already transcribed): when the transcript artifacts
+  exist server-side it just pulls them; otherwise it starts a fresh
+  server-side ingest, polls, and pulls. No media flags — there is no local
+  extraction.
 
 ## Timeline commands (`timeline.json` v2)
 
 - **`timeline validate --job-dir <dir> [--json]`**
-  Local schema + semantic + capability validation of `<job>/timeline.json`.
-  Exit `2` if invalid.
+  Local schema + semantic + capability validation of `<job>/timeline.json`
+  (the one purely local verb — it touches no media). Exit `2` if invalid.
 
-- **`timeline resolve --job-dir <dir> --phrase <text> [--near <srcSeconds>] [--occurrence <n>] [--source <name>] [--json]`**
-  Resolve a transcript phrase to **exact source seconds** (word-accurate).
-  The ONLY way to turn a phrase into an anchor time. Multiple hits → exit `3`
-  with per-occurrence context; pick one with `--near` or `--occurrence`
+- **`timeline resolve --job-dir <dir> --phrase <text> [--occurrence <n>] [--source <name>] [--json]`**
+  Resolve a transcript phrase to **exact source seconds** (word-accurate,
+  server-side). The ONLY way to turn a phrase into an anchor time. Multiple
+  hits → exit `3` with per-occurrence context; pick one with `--occurrence`
   (1-based). Not found → fuzzy suggestions, exit `1`.
 
 - **`timeline compile --job-dir <dir> [--json]`**
   **Cloud compile**: uploads `timeline.json`, the server validates, resolves
-  anchors, derives caption cues, and returns `resolved/plan.json` +
-  `resolved/diagnostics.json` (written into the job dir). Iterate until exit
-  `0`. Exit `2` = validation failed (fix the reported `path`s), `3` =
+  anchors, sources silences from the job's cloud files, derives caption
+  cues, and returns `resolved/plan.json` + `resolved/diagnostics.json`
+  (written into the job dir). On success prints the `View & comment` watch
+  link — the compiled cut is already watchable in the web app. Iterate until
+  exit `0`. Exit `2` = validation failed (fix the reported `path`s), `3` =
   ambiguous anchor (disambiguate with `timeline resolve`). Never hand-edit
   anything under `resolved/`.
 
-## Preview / render commands
+- **`timeline captions generate --job-dir <dir> [--preset grouped|opus-karaoke] [--json]`**
+  Enable captions in `timeline.json` (preset only), then server-compile to
+  derive/report cues.
 
-- **`compose --job-dir <dir> [--render] [--quality draft|standard|high] [--fps 30] [--out <path>] [--no-push] [--json]`**
-  Build the local HyperFrames composition from `resolved/plan.json` (cut +
-  captions/zooms/overlays) in `<job>/composition/` — media proxies, referenced
-  assets, and `index.html`. Without `--render`, prints the composition dir +
-  the exact `hyperframes render` command to run. With `--render`, runs it
-  (requires the `hyperframes` CLI on PATH: `npm install -g hyperframes`);
-  default output `<job>/preview.mp4` (the render IS the preview in the cloud-first flow). This is the LOCAL delivery path.
-  If `<job>/vertical_src.mp4` is missing, compose **bakes it automatically**
-  from `job.json`'s `source_path` (ffmpeg applies rotation metadata, so
-  rotated sources come out truly vertical) — no re-init needed.
-  After a successful render the output is **pushed to the video's cloud
-  files automatically** (a custom `--out` basename is also pushed under
-  `final.mp4` when `--quality high`, else `preview.mp4`, so the web watch
-  page sees it) and the CLI prints `View & comment: <url>` (`web_url` +
-  `pushed` in `--json`). `--no-push` skips the upload.
+## Render commands
 
-- **`cloud render --job-dir <dir> --mode preview|final [--wait] [--poll-interval 10] [--out <path>] [--json]`**
-  Submit a server-side render of the compiled plan. Without `--wait`: prints
-  `render_id` and exits `0`. With `--wait`: polls until terminal; on
-  `completed`, downloads the video to `--out` (default `<job>/preview.mp4` or
-  `<job>/final.mp4`). `failed` → exit `1` with the error.
+- **`render [--mode preview|final] --job-dir <dir> [--no-wait] [--poll-interval 10] [--out <path>] [--json]`**
+  THE render verb: submits a cloud render of the compiled plan (works right
+  after `timeline compile`), **waits by default**, and downloads the result
+  to `<job>/preview.mp4` / `<job>/final.mp4`. Mode defaults to `preview`.
+  `--no-wait` submits and prints `render_id` only.
+
+- **`cloud render --mode preview|final --job-dir <dir> [--wait] [--poll-interval 10] [--out <path>] [--json]`**
+  Same implementation, legacy spelling (`--wait` is opt-in here).
 
 - **`cloud status <render_id> [--json]`**
   One status GET: `pending|running|completed|failed` (+ `video_url` when
@@ -87,39 +88,43 @@ anchor (timeline group).
 
 ## Verification / QA commands
 
-- **`verify --job-dir <dir> [--json]`**
-  **Cloud verification** of the rendered preview: uploads/points at the
-  preview and the server re-checks every join for duplicated phrases (a
-  retake left in → error) and over-long gaps (dead air → warning/error).
-  Writes `verify.json`; exit `2` on needs-fixes. Requires a rendered preview
-  (`compose` + hyperframes render, or `cloud render --mode preview`).
-  Caveat: the duplicated-phrase check over-triggers on thematically narrow
-  monologues — if every join is flagged (including plain pause-tightening
-  joins), adjudicate against `flags.txt` instead of blindly recutting.
+- **`verify --job-dir <dir> [--full] [--window <s>] [--json]`**
+  **Fully server-side verification** of the rendered preview: the server
+  re-checks every join for duplicated phrases (a retake left in → error) and
+  over-long gaps (dead air → warning/error) against its own copy of the
+  preview — nothing is uploaded. Writes `verify.json`; exit `2` on
+  needs-fixes. Caveat: the duplicated-phrase check over-triggers on
+  thematically narrow monologues — if every join is flagged (including plain
+  pause-tightening joins), adjudicate against `flags.txt` instead of blindly
+  recutting.
 
-- **`qa frames --range <start>-<end> [--cols <n>] [--interval <s>] --job-dir <dir> [--json]`**
-  **Local ffmpeg** filmstrip PNG for the window →
-  `<job>/qa/frames_<start>_<end>.png`. Read the PNG to inspect frames.
+- **`qa frames (--start <s> --end <s> | --join <i> [--span 2] | --out-start <s> --out-end <s>) [--cols <n>] [--interval <s>] --job-dir <dir> [--json]`**
+  **Server-rendered** filmstrip PNG(s) → `<job>/qa/frames_<start>_<end>.png`.
+  Three addressing modes (exactly one): `--start/--end` in SOURCE seconds;
+  `--join <i>` renders the two sides of compiled-plan join `i` (1-based —
+  the last/first `--span` seconds of the segments meeting there) as
+  `…-a.png` (tail) + `…-b.png` (head); `--out-start/--out-end` in OUTPUT
+  seconds, mapped through `resolved/plan.json` (windows crossing a join
+  split into `-a`/`-b`/… PNGs). Read the PNGs to inspect frames.
 
-- **`qa waveform --range <start>-<end> --job-dir <dir> [--json]`**
-  **Local ffmpeg** waveform PNG + word-timing sidecar →
+- **`qa waveform --start <s> --end <s> --job-dir <dir> [--json]`**
+  **Server-rendered** waveform PNG + word-timing sidecar →
   `<job>/qa/waveform_<start>_<end>.png` and
   `<job>/qa/waveform_<start>_<end>.words.json` (word list with timings for
-  the window). Free and fast — use for cut-edge adjudication.
+  the window, SOURCE seconds). Use for cut-edge adjudication.
 
 ## File sync commands
 
 - **`files pull --job-dir <dir> [--only <name,name>] [--json]`**
-  List the cloud job's artifacts and fetch each (or the `--only` subset) into
+  List the cloud job's files and fetch each (or the `--only` subset) into
   the job dir, **preserving relative paths** (`resolved/plan.json` →
   `<job>/resolved/plan.json`, `prompts/author-edl.prompt.md` →
-  `<job>/prompts/author-edl.prompt.md`). `.json` artifacts pretty-printed. Use to
+  `<job>/prompts/author-edl.prompt.md`). Byte-exact, sha256-skipped. Use to
   recover job state on a fresh machine.
 
-- **`files push --job-dir <dir> [--only <name,name>] [--json]`**
-  Upload local job artifacts (e.g. `timeline.json`, referenced assets under
-  `assets/`) to the cloud job. Content-hash-cached — unchanged files are not
-  re-uploaded.
+- **`files push --job-dir <dir> <paths…> [--json]`**
+  Upload local job files (e.g. `timeline.json`, referenced assets) to the
+  cloud job. Content-hash-cached — unchanged files are not re-uploaded.
 
 ## Review round commands (ClipReady review sessions)
 
@@ -133,13 +138,16 @@ anchor (timeline group).
   Push review-round events (one mode per call; run id defaults to
   `review/round.json`). `--stage` posts a progress event
   (`provisioning|transcribing|edl|render_preview|qc|render_final|uploading|log`).
-  `--timeline` compiles `<job>/timeline.json` (same as `timeline compile`,
-  exit `2` if not clean) and pushes a `timeline_update` — the review page
-  updates live. `--complete` compiles fresh (must be clean) and pushes the
-  terminal `completed` event (`{edl, timeline, plan, duration_s, outcomes?}`;
+  `--timeline` compiles `<job>/timeline.json` in the cloud (exit `2` if not
+  clean) and pushes a `timeline_update` — the review page updates live.
+  `--complete` compiles fresh (must be clean) and pushes the terminal
+  `completed` event (`{edl, timeline, plan, duration_s, outcomes?}`;
   `--outcomes` is a JSON file of `[{change_id, ok, note?}]`). Both
   `--timeline` and `--complete` upload the timeline's referenced assets
   automatically (sha256-cached in `<job>/review/assets.json`).
+
+- **`review prompt --job-dir <dir> [--json]`** — print the pulled round
+  instruction.
 
 ## Utility
 
@@ -147,17 +155,19 @@ anchor (timeline group).
 - **`status --job-dir <dir> [--json]`** — cloud job state + local artifact existence.
 - **`skill install [--target <dir>] [--json]`** — copy the bundled
   `video-editing` agent skill into `<target|~/.claude/skills>/video-editing`.
+- **`config set-key <key> | set-base <url> | path`** — store credentials in
+  `~/.config/video-editing/.env` (the only verb that runs without one).
 
 ## Typical session
 
 ```
 export CLIPREADY_API_BASE=https://…  CLIPREADY_API_KEY=…
-video-editing init --source "clip.mp4" --job-dir jobs/clip
-video-editing transcribe --job-dir jobs/clip
+video-editing init --source "clip.mp4" --job-dir jobs/clip   # upload + ingest + pull (transcribe included)
 # READ jobs/clip/prompts/author-edl.prompt.md — it is the editorial brief. Author timeline.json.
-video-editing timeline compile --job-dir jobs/clip --json     # fix until exit 0
-video-editing compose --job-dir jobs/clip --render            # local preview render
-video-editing verify --job-dir jobs/clip --json               # fix → recompile → re-render → re-verify
-video-editing qa frames --range 0-5 --job-dir jobs/clip       # spot-check looks
-video-editing cloud render --job-dir jobs/clip --mode final --wait
+video-editing timeline validate --job-dir jobs/clip --json
+video-editing timeline compile --job-dir jobs/clip --json    # fix until exit 0; prints the watch link
+video-editing render --job-dir jobs/clip                     # cloud preview render (waits + downloads)
+video-editing verify --job-dir jobs/clip --json              # fix → recompile → re-render → re-verify
+video-editing qa frames --join 1 --job-dir jobs/clip         # spot-check the first join's two sides
+video-editing render --mode final --job-dir jobs/clip
 ```
