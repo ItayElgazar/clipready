@@ -35,8 +35,9 @@ npx skills add ItayElgazar/clipready --skill video-editing    # this skill
 Requirements — this is the FULL list:
 
 - **Node ≥ 20**
-- **`CLIPREADY_API_KEY`** — from the ClipReady settings page
-- **`CLIPREADY_API_BASE`** — the ClipReady API base URL
+- **A ClipReady API key** — one-time login: `video-editing auth api-key` (paste
+  the key from the ClipReady settings page; the base URL defaults to the hosted
+  cloud). Env vars `CLIPREADY_API_KEY`/`CLIPREADY_API_BASE` override when set.
 
 **No ffmpeg. No ffprobe. No hyperframes. No ElevenLabs key.** Nothing runs on
 the local machine except the CLI itself — do not install media tools, and do
@@ -103,14 +104,18 @@ never work around it.
    Can run while the user reviews. Fix `timeline.json`, re-compile,
    re-render, re-verify until clean; cap at ~3 fix passes and surface
    remaining findings rather than looping.
-7. **QA looks** — spot-check any window with server-rendered visuals:
-   `video-editing qa frames --start <a> --end <b> --job-dir "<job>"`
-   (filmstrip PNG, SOURCE seconds), or plan-addressed:
-   `qa frames --join <i>` (the two sides of plan join i → `-a`/`-b` PNGs)
-   and `qa frames --out-start <a> --out-end <b>` (OUTPUT seconds mapped
-   through the compiled plan). `video-editing qa waveform --start <a> --end <b>`
-   adds a waveform PNG + word-timing sidecar JSON. Read the PNGs to
-   adjudicate.
+7. **QA looks** — spot-check any window with server-rendered visuals.
+   THE close-look tool is
+   `video-editing qa inspect --start <a> --end <b> --job-dir "<job>"`:
+   one composite PNG with the filmstrip, the waveform, word labels, AND
+   the compiled plan's cut regions shaded red ("cut") — everything needed
+   to adjudicate a moment in a single image. Same addressing as frames:
+   `qa inspect --join <i>` (the two sides of plan join i → `-a`/`-b`
+   PNGs) and `qa inspect --out-start <a> --out-end <b>` (OUTPUT seconds
+   mapped through the compiled plan). The narrower views still exist:
+   `video-editing qa frames …` (filmstrip only, same addressing modes)
+   and `video-editing qa waveform --start <a> --end <b>` (waveform PNG +
+   word-timing sidecar JSON). Read the PNGs to adjudicate.
 8. **Final** — `video-editing render --mode final --job-dir "<job>"`.
 
 ## Your editorial brief arrives from the cloud

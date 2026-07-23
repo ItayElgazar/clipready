@@ -6,8 +6,8 @@ paths (they contain spaces).
 
 **Every verb requires ClipReady credentials.** Resolution:
 
-- **base**: `--api-base` → env `CLIPREADY_API_BASE`
-- **key** (sent as `Authorization: Bearer <key>`): `--api-key` → env `CLIPREADY_API_KEY`
+- **base**: `--api-base` → env `CLIPREADY_API_BASE` → the hosted cloud (default)
+- **key** (sent as `Authorization: Bearer <key>`): `--api-key` → env `CLIPREADY_API_KEY` → the config file written by `video-editing auth api-key`
 - **video id**: `--video-id` → `<job>/job.json` (written by `init`) → env `VIDEO_ID`
 
 A missing base or key is a clear error → non-zero exit, nothing runs. There is
@@ -113,6 +113,19 @@ support transparently fall back to a single retried upload.
   `<job>/qa/waveform_<start>_<end>.words.json` (word list with timings for
   the window, SOURCE seconds). Use for cut-edge adjudication.
 
+- **`qa inspect (--start <s> --end <s> | --join <i> [--span 2] | --out-start <s> --out-end <s>) [--n-frames <n>] --job-dir <dir> [--json]`**
+  **THE close-look tool** — a **server-rendered** combined composite PNG →
+  `<job>/qa/inspect_<start>_<end>.png`: filmstrip + waveform + word labels
+  in one image, with the compiled plan's cut regions shaded translucent
+  red (labeled "cut") over the waveform. Same three addressing modes as
+  `qa frames` (exactly one): `--start/--end` in SOURCE seconds; `--join <i>`
+  renders the two sides of compiled-plan join `i` as `…-a.png` (tail) +
+  `…-b.png` (head) — the sides are discontiguous in source time, hence two
+  PNGs; `--out-start/--out-end` in OUTPUT seconds mapped through
+  `resolved/plan.json`. `--n-frames` sets the filmstrip frame count
+  (default 10). Prefer this over separate frames + waveform calls when
+  adjudicating a cut.
+
 ## File sync commands
 
 - **`files pull --job-dir <dir> [--only <name,name>] [--json]`**
@@ -161,13 +174,13 @@ support transparently fall back to a single retried upload.
 ## Typical session
 
 ```
-export CLIPREADY_API_BASE=https://…  CLIPREADY_API_KEY=…
+video-editing auth api-key            # once per machine (skip if already logged in)
 video-editing init --source "clip.mp4" --job-dir jobs/clip   # upload + ingest + pull (transcribe included)
 # READ jobs/clip/prompts/author-edl.prompt.md — it is the editorial brief. Author timeline.json.
 video-editing timeline validate --job-dir jobs/clip --json
 video-editing timeline compile --job-dir jobs/clip --json    # fix until exit 0; prints the watch link
 video-editing render --job-dir jobs/clip                     # cloud preview render (waits + downloads)
 video-editing verify --job-dir jobs/clip --json              # fix → recompile → re-render → re-verify
-video-editing qa frames --join 1 --job-dir jobs/clip         # spot-check the first join's two sides
+video-editing qa inspect --join 1 --job-dir jobs/clip        # close-look at the first join's two sides (filmstrip+waveform+cuts)
 video-editing render --mode final --job-dir jobs/clip
 ```
